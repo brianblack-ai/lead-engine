@@ -25,7 +25,8 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
   const [quote, setQuote] = useState<QuoteResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-
+  const [leadSent, setLeadSent] = useState(false);
+	
   const emailOk = useMemo(() => /\S+@\S+\.\S+/.test(form.contactEmail), [form.contactEmail]);
   const isValid = useMemo(() => {
     const guest = Number(form.guestCount); const hours = Number(form.hoursOnsite);
@@ -51,6 +52,23 @@ export default function Page() {
       if (!res.ok) throw new Error(await res.text());
       const data = (await res.json()) as QuoteResponse;
       setQuote(data);
+// Post the lead + quote to Slack
+const leadRes = await fetch("/api/lead", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    form: {
+      ...form,
+      guestCount: Number(form.guestCount),
+      hoursOnsite: Number(form.hoursOnsite),
+      screensCount: Number(form.screensCount || 0),
+      projectorsCount: Number(form.projectorsCount || 0),
+    },
+    quote: data,
+  }),
+});
+if (!leadRes.ok) console.warn("Lead post failed:", await leadRes.text());
+setLeadSent(true);
     } catch (err: any) { setError(err?.message || "Request failed"); }
     finally { setLoading(false); }
   }
