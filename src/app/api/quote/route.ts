@@ -1,11 +1,21 @@
-type Body = {
-  eventName: string; orgName: string; contactEmail: string; eventDate?: string;
-  guestCount: number; hoursOnsite: number; ledWall: boolean;
-  screensCount: number; projectorsCount: number; tightWindow: boolean;
-  overnightOrHoliday: boolean; flownElements: boolean; venueRiggingKnown: boolean;
-};
+type QuoteBody = {
+  eventName: string;
+  orgName: string;
+  contactEmail: string;
+  eventDate?: string;
 
-const num = (n: any, d = 0) => { const v = Number(n); return Number.isFinite(v) ? v : d; };
+  guestCount: number;
+  hoursOnsite: number;
+  ledWall: boolean;
+  screensCount: number;
+  projectorsCount: number;
+
+  tightWindow: boolean;
+  overnightOrHoliday: boolean;
+  flownElements: boolean;
+  venueRiggingKnown: boolean;
+};
+const num = (n: unknown, d = 0) => { const v = Number(n); return Number.isFinite(v) ? v : d; };
 
 // Setup/strike tiers by guest count (tweak later if needed)
 function setupStrikeHours(guests: number): number {
