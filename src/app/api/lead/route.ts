@@ -36,17 +36,32 @@ export async function POST(req: Request) {
       ].filter(Boolean).join(", ") || "None"
     }`,
     `Quote: ${fmt(quote.totalRange[0])} – ${fmt(quote.totalRange[1])} (mid ${fmt(quote.totalMidpoint)})`,
-  ].join("\n");
+  ];
+
+// Extra summary lines (no duplicate of "Quote", we keep just gear/labor/techs)
+lines.push(
+  `Gear: ${fmt(quote.gearSubtotal)}  •  Labor: ${fmt(quote.laborSubtotal)}`,
+  `Techs: ${quote.details.techCount}  •  Billed hours/tech: ${quote.details.billedHoursPerTech}  •  Multiplier: ${quote.details.overtimeMultiplier}x`
+);
+
+// If there are additional risk flags, append them (you already list some)
+if (Array.isArray(quote.riskFlags) && quote.riskFlags.length) {
+  lines.push(`• ${quote.riskFlags.join("  •  ")}`);
+}
+
+// Build final Slack message
+const text = lines.join("\n");
+
 
   const res = await fetch(webhook, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: lines }),
+    body: JSON.stringify({ text }),
   });
 
   const txt = await res.text();             // <-- helpful debug
   if (!res.ok) {
     return new Response(JSON.stringify({ error: "Slack webhook failed", status: res.status, txt }), { status: 502 });
   }
-  return Response.json({ ok: true });
+  return new Response(JSON.stringify({ ok: true }), { status: 200 });
 }
