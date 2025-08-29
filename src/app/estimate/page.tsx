@@ -12,7 +12,7 @@ type QuoteResponse = {
   gearSubtotal: number; laborSubtotal: number; totalMidpoint: number; totalRange: [number, number];
   riskFlags: string[]; details: { techCount: number; billedHoursPerTech: number; overtimeMultiplier: number; laborRate: number };
 };
-const toNum = (v: string): Num => (v.trim() === "" ? "" : Number(v));
+const toNum = (v: string): Num => (v === "" ? "" : Math.max(0, Number(v)));
 const fmt = (n: number) => n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
 export default function Page() {
@@ -69,10 +69,9 @@ const leadRes = await fetch("/api/lead", {
 });
 if (!leadRes.ok) console.warn("Lead post failed:", await leadRes.text());
 setLeadSent(true);
-    } catch (err) { 
-      const msg = err instanceof Error ? err.message : "Request failed";
-      setError(msg);
-}
+    } catch (err: any) { setError(err?.message || "Request failed"); }
+    finally { setLoading(false); }
+  }
 
   return (
     <main className="max-w-4xl mx-auto p-6 space-y-8">
@@ -102,26 +101,17 @@ setLeadSent(true);
         <section className="grid gap-4 sm:grid-cols-3">
           <label className="grid gap-1">
             <span className="text-sm font-medium">Guest count *</span>
-            <input
-  type="number"
-  min="1"
-  className="border rounded-md p-2"
-  value={form.guestCount}
-  onChange={(e) => update("guestCount", toNum(e.target.value))}
-  required
-/>
-
+            <input type="number" min="1" className="border rounded-md p-2" value={form.guestCount as any} onChange={(e)=>update("guestCount", toNum(e.target.value))} required />
           </label>
           <label className="grid gap-1">
   <span className="text-sm font-medium">
     Show hours (rehearsal → end of show) *
   </span>
-
   <input
     type="number"
     min="1"
     className="border rounded-md p-2"
-    value={form.hoursOnsite}
+    value={form.hoursOnsite as any}
     onChange={(e) => update("hoursOnsite", toNum(e.target.value))}
     placeholder="e.g., 6"
     required
@@ -136,11 +126,11 @@ setLeadSent(true);
         <section className="grid gap-4 sm:grid-cols-3">
           <label className="grid gap-1">
             <span className="text-sm font-medium">Screens (qty)</span>
-            <input type="number" min="0" className="border rounded-md p-2" value={form.screensCount} onChange={(e)=>update("screensCount", toNum(e.target.value))} />
+            <input type="number" min="0" className="border rounded-md p-2" value={form.screensCount as any} onChange={(e)=>update("screensCount", toNum(e.target.value))} />
           </label>
           <label className="grid gap-1">
             <span className="text-sm font-medium">Projectors (qty)</span>
-            <input type="number" min="0" className="border rounded-md p-2" value={form.projectorsCount} onChange={(e)=>update("projectorsCount", toNum(e.target.value))} />
+            <input type="number" min="0" className="border rounded-md p-2" value={form.projectorsCount as any} onChange={(e)=>update("projectorsCount", toNum(e.target.value))} />
           </label>
         </section>
 
