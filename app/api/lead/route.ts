@@ -1,5 +1,6 @@
 // app/api/lead/route.ts
 export const runtime = 'nodejs';
+
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 
@@ -16,30 +17,54 @@ export async function OPTIONS() {
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { name = '', email = '', company = '', estimate = '', source = 'web' } = body || {};
+    const {
+      name = '',
+      email = '',
+      company = '',
+      estimate = '',
+      source = 'web',
+    } = body || {};
 
-    const raw = process.env.GOOGLE_SERVICE_ACCOUNT;
-    if (!raw) throw new Error('missing GOOGLE_SERVICE_ACCOUNT env');
+    // --- 🔑 Load Google credentials ---
+    let creds: { client_email: string; private_key: string };
 
-    const creds = JSON.parse(raw);
+    if (process.env.GOOGLE_SERVICE_ACCOUNT) {
+      // Case A: full JSON string in one env var
+      creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
+    } else {
+      // Case B: split env vars
+      creds = {
+        client_email: process.env.GOOGLE_CLIENT_EMAIL || '',
+        private_key: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+      };
+    }
+
+    if (!creds.client_email || !creds.private_key) {
+      throw new Error('Google credentials are missing');
+    }
+
     const jwt = new google.auth.JWT(
       creds.client_email,
       undefined,
-      (creds.private_key || '').replace(/\\n/g, '\n'),
+      creds.private_key,
       ['https://www.googleapis.com/auth/spreadsheets']
     );
 
-    // 🔑 Ensure we actually obtain an access token (throws if creds/API wrong)
     await jwt.authorize();
 
     const sheets = google.sheets({ version: 'v4', auth: jwt });
 
-    const timestamp = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
+    const timestamp = new Date().toLocaleString('en-US', {
+      timeZone: 'America/Chicago',
+    });
+
     const res = await sheets.spreadsheets.values.append({
-      spreadsheetId: process.env.SHEET_ID!,
+      spreadsheetId: process.env.SHEET_ID,
       range: 'A:F',
       valueInputOption: 'USER_ENTERED',
-      requestBody: { values: [[timestamp, name, email, company, String(estimate), source]] },
+      requestBody: {
+        values: [[timestamp, name, email, company, String(estimate), source]],
+      },
     });
 
     return NextResponse.json(
