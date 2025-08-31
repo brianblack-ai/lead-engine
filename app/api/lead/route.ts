@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       creds = {
         client_email: process.env.GOOGLE_CLIENT_EMAIL || '',
         // IMPORTANT: turn the literal "\n" back into newlines
-        private_key: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+        private_key: (process.env.GOOGLE_PRIVATE_KEY || '')
       };
       console.log('[lead] creds mode = split vars');
     }
