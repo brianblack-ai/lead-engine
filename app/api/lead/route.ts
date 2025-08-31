@@ -46,45 +46,65 @@ export async function POST(req: Request) {
 
     // 1) Read body + log what keys actually arrived
     const body = await req.json();
-    console.log("[lead] body keys ->", Object.keys(body));
+  console.log("[lead] body keys ->", Object.keys(body));
 
-    // 2) Map to your sheet columns (A..F = Timestamp, Name, Email, Company, Estimate, Source)
-    const name     = body.name ?? "";
-    const email    = body.email ?? "";
-    const company  = body.company ?? body.org ?? body.organization ?? body.companyName ?? "";
-    const estimate = body.estimate ?? body.quote ?? body.estimateRange ?? body.budget ?? "";
-    const source   = body.source ?? body.utm_source ?? "web";
+const name     = body.name ?? "";
+const email    = body.email ?? "";
+const company  = body.company ?? body.org ?? body.organization ?? body.companyName ?? "";
+const estimate = body.estimate ?? body.quote ?? body.estimateRange ?? body.budget ?? "";
+const source   = body.source ?? body.utm_source ?? "web";
 
-    // 3) Sheets client + append
-    const spreadsheetId = process.env.SHEET_ID!;
-    if (!spreadsheetId) throw new Error("missing SHEET_ID");
-    const sheets = await getSheets();
-
-    const values = [[
-      new Date().toISOString(), // A Timestamp
-      name,                     // B Name
-      email,                    // C Email
-      company,                  // D Company
-      estimate,                 // E Estimate
-      source                    // F Source
-    ]];
-
-    const res = await sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range: "A:F",
-      valueInputOption: "RAW",
-      requestBody: { values },
-    });
-
-    return new Response(
-      JSON.stringify({ ok: true, updatedRange: res.data.updates?.updatedRange }),
-      { status: 200, headers: { "content-type": "application/json" } }
-    );
-  } catch (err: any) {
-    console.error("[lead] error:", err?.message);
-    return new Response(
-      JSON.stringify({ ok: false, error: `lead append error: ${err?.message || "unknown"}` }),
-      { status: 500, headers: { "content-type": "application/json" } }
-    );
-  }
+// 1) Minimal validation
+if (!name || !email) {
+  return new Response(JSON.stringify({ ok: false, error: "name and email are required" }), {
+    status: 400, headers: { "content-type": "application/json" }
+  });
 }
+
+// 3) Optional: pin to a specific tab (e.g., "Leads")
+//   const rangeRef = "Leads!A:F";  // <- if your sheet tab is named "Leads"
+const rangeRef = "A:F";             // <- current behavior (first sheet)
+
+// Append to Sheets
+const spreadsheetId = process.env.SHEET_ID!;
+const sheets = await getSheets();
+const values = [[
+  new Date().toISOString(), // A Timestamp
+  name,                     // B Name
+  email,                    // C Email
+  company,                  // D Company
+  estimate,                 // E Estimate
+  source                    // F Source
+]];
+const appendRes = await sheets.spreadsheets.values.append({
+  spreadsheetId,
+  range: rangeRef,
+  valueInputOption: "RAW",
+  requestBody: { values },
+});
+
+// 2) Slack notify (best-effort, don't fail the request if Slack is down)
+try {
+  if (process.env.SLACK_WEBHOOK_URL) {
+    await fetch(process.env.SLACK_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: `🎯 *New Lead*  
+*Name:* ${name}
+*Email:* ${email}
+*Company:* ${company || "—"}
+*Estimate:* ${estimate || "—"}
+*Source:* ${source}`
+      }),
+    });
+  }
+} catch (e) {
+  console.warn("[lead] slack notify failed:", (e as Error).message);
+}
+
+return new Response(
+  JSON.stringify({ ok: true, updatedRange: appendRes.data.updates?.updatedRange }),
+  { status: 200, headers: { "content-type": "application/json" } }
+);
+
