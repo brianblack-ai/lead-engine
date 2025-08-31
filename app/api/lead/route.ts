@@ -41,11 +41,12 @@ export async function POST(req: Request) {
     }
 
     const jwt = new google.auth.JWT(
-      creds.client_email,
-      undefined,
-      creds.private_key,
-      ['https://www.googleapis.com/auth/spreadsheets']
-    );
+  creds.client_email,
+  undefined,
+  (creds.private_key || '').replace(/\\n/g, '\n'),
+  ['https://www.googleapis.com/auth/spreadsheets']
+);
+
 
     await jwt.authorize();
 
