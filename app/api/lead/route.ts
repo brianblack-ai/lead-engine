@@ -19,18 +19,21 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const { name = '', email = '', company = '', estimate = '', source = 'web' } = body || {};
 
-    // --- Load Google credentials ---
+    // --- Load Google credentials (supports both styles) ---
     let creds: { client_email: string; private_key: string };
 
     if (process.env.GOOGLE_SERVICE_ACCOUNT) {
       // Case A: full JSON string in one env var
       creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
+      console.log('[lead] creds mode = full JSON');
     } else {
       // Case B: split env vars
       creds = {
         client_email: process.env.GOOGLE_CLIENT_EMAIL || '',
+        // IMPORTANT: turn the literal "\n" back into newlines
         private_key: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
       };
+      console.log('[lead] creds mode = split vars');
     }
 
     if (!creds.client_email || !creds.private_key) {
@@ -48,7 +51,9 @@ export async function POST(req: Request) {
 
     const sheets = google.sheets({ version: 'v4', auth: jwt });
 
-    const timestamp = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
+    const timestamp = new Date().toLocaleString('en-US', {
+      timeZone: 'America/Chicago',
+    });
 
     const res = await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.SHEET_ID,
@@ -61,12 +66,17 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       { ok: true, range: res.data.updates?.updatedRange ?? null },
-      { status: 200, headers: cors as any }
+      { status: 200, headers: cors as any },
     );
   } catch (err: any) {
     console.error('lead append error:', err?.message || err);
     return NextResponse.json(
-      { ok: false, error: String(err?.mes
+      { ok: false, error: String(err?.message || err) },
+      { status: 500, headers: cors as any },
+    );
+  }
+}
+
 
   }
 }
