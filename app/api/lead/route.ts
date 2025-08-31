@@ -17,15 +17,9 @@ export async function OPTIONS() {
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const {
-      name = '',
-      email = '',
-      company = '',
-      estimate = '',
-      source = 'web',
-    } = body || {};
+    const { name = '', email = '', company = '', estimate = '', source = 'web' } = body || {};
 
-    // --- 🔑 Load Google credentials ---
+    // --- Load Google credentials ---
     let creds: { client_email: string; private_key: string };
 
     if (process.env.GOOGLE_SERVICE_ACCOUNT) {
@@ -54,9 +48,7 @@ export async function POST(req: Request) {
 
     const sheets = google.sheets({ version: 'v4', auth: jwt });
 
-    const timestamp = new Date().toLocaleString('en-US', {
-      timeZone: 'America/Chicago',
-    });
+    const timestamp = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
 
     const res = await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.SHEET_ID,
@@ -74,9 +66,8 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error('lead append error:', err?.message || err);
     return NextResponse.json(
-      { ok: false, error: String(err?.message || err) },
-      { status: 500, headers: cors as any }
-    );
+      { ok: false, error: String(err?.mes
+
   }
 }
 
