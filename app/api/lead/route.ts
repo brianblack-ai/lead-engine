@@ -1,57 +1,67 @@
 // app/api/lead/route.ts
 import { google } from "googleapis";
-import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
 
+// --- helpers ---
 function getPrivateKey(): string {
+  // Supports BOTH styles:
+  // 1) Multi-line PEM pasted in Vercel
+  // 2) Single-line with literal "\n"
   const raw = (process.env.GOOGLE_PRIVATE_KEY || "").trim().replace(/^"|"$/g, "");
-  // If the env contains literal backslash-n sequences, convert them.
   return raw.includes("\\n") ? raw.replace(/\\n/g, "\n") : raw;
 }
 
-function sanity() {
+function sanity(label = "pre-jwt") {
   const k = getPrivateKey();
-  console.log("[lead] key sanity:", {
+  const looksPEM =
+    k.startsWith("-----BEGIN PRIVATE KEY-----") && k.includes("-----END PRIVATE KEY-----");
+  console.log("[lead] sanity:", {
+    label,
     hasKey: !!k,
     len: k.length,
-    looksPEM: k.startsWith("-----BEGIN PRIVATE KEY-----") && k.includes("END PRIVATE KEY-----"),
+    nlCount: (k.match(/\n/g) || []).length,
+    looksPEM,
+    hasClientEmail: !!process.env.GOOGLE_CLIENT_EMAIL,
+    hasSheetId: !!process.env.SHEET_ID,
   });
 }
 
-
 async function getSheets() {
-  const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
-  const privateKey = getPrivateKey();
-  if (!clientEmail || !privateKey) {
-    throw new Error("Missing GOOGLE_CLIENT_EMAIL or GOOGLE_PRIVATE_KEY");
-  }
-
+  const email = process.env.GOOGLE_CLIENT_EMAIL;
+  const key = getPrivateKey();
+  if (!email || !key) throw new Error("missing GOOGLE_CLIENT_EMAIL or GOOGLE_PRIVATE_KEY");
   const auth = new google.auth.JWT({
-    email: clientEmail,
-    key: privateKey,
+    email,
+    key,
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
   return google.sheets({ version: "v4", auth });
 }
 
-export async function POST(req: NextRequest) {
+// --- routes ---
+export async function GET() {
+  sanity("GET-check");
+  return new Response(JSON.stringify({ ok: true }), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+export async function POST(req: Request) {
   try {
-    envSanity(); // logs shape once per invocation
+    sanity("POST-check");
 
-    const body = await req.json().catch(() => ({}));
-    // Minimal example payload; extend as needed:
-    const { name = "", email = "", message = "", source = "web" } = body;
+    const { name = "", email = "", message = "", source = "web" } = await req.json();
 
-    const SHEET_ID = process.env.SHEET_ID;
-    if (!SHEET_ID) throw new Error("Missing SHEET_ID");
+    const spreadsheetId = process.env.SHEET_ID;
+    if (!spreadsheetId) throw new Error("missing SHEET_ID");
 
     const sheets = await getSheets();
 
-    // Append to first sheet, columns A:D (adjust range to your sheet/tab)
     const rows = [[new Date().toISOString(), name, email, message, source]];
     const res = await sheets.spreadsheets.values.append({
-      spreadsheetId: SHEET_ID,
+      spreadsheetId,
       range: "A1",
       valueInputOption: "RAW",
       requestBody: { values: rows },
@@ -62,23 +72,10 @@ export async function POST(req: NextRequest) {
       { status: 200, headers: { "content-type": "application/json" } }
     );
   } catch (err: any) {
-    // Bubble up precise, sanitized error
-    console.error("[lead] error:", { message: err?.message, stack: err?.stack });
-    const msg =
-      err?.message === "Missing GOOGLE_CLIENT_EMAIL or GOOGLE_PRIVATE_KEY"
-        ? "lead append error: missing credentials"
-        : err?.message?.includes("PERMISSION")
-        ? "lead append error: service account lacks Editor on the Sheet"
-        : `lead append error: ${err?.message || "unknown"}`;
-    return new Response(JSON.stringify({ ok: false, error: msg }), {
-      status: 500,
-      headers: { "content-type": "application/json" },
-    });
+    console.error("[lead] error:", err?.message);
+    return new Response(
+      JSON.stringify({ ok: false, error: `lead append error: ${err?.message || "unknown"}` }),
+      { status: 500, headers: { "content-type": "application/json" } }
+    );
   }
-}
-
-export async function GET() {
-  // Quick ping for debugging
-  const ok = Boolean(process.env.GOOGLE_PRIVATE_KEY && process.env.GOOGLE_CLIENT_EMAIL && process.env.SHEET_ID);
-  return new Response(JSON.stringify({ ok }), { status: ok ? 200 : 500 });
 }
