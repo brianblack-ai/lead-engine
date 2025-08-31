@@ -2,38 +2,23 @@
 import { google } from "googleapis";
 import type { NextRequest } from "next/server";
 
-export const runtime = "nodejs";             // IMPORTANT: Google auth needs Node, not Edge
-export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 function getPrivateKey(): string {
-  const raw = process.env.GOOGLE_PRIVATE_KEY || "";
-  // Handle three common cases:
-  // 1) Real multiline key (Vercel "Paste" with \n): needs \\n -> \n
-  // 2) Already-correct newlines: leave as-is
-  // 3) Accidentally double-escaped or quoted: trim quotes
-  const trimmed = raw.trim().replace(/^"|"$/g, ""); // strip wrapping quotes if any
-  // If you pasted with literal "\n", Node reads them as \\n characters.
-  const normalized =
-    trimmed.includes("\\n") ? trimmed.replace(/\\n/g, "\n") : trimmed;
-  return normalized;
+  const raw = (process.env.GOOGLE_PRIVATE_KEY || "").trim().replace(/^"|"$/g, "");
+  // If the env contains literal backslash-n sequences, convert them.
+  return raw.includes("\\n") ? raw.replace(/\\n/g, "\n") : raw;
 }
 
-function envSanity() {
-  const key = getPrivateKey();
-  const starts = key.startsWith("-----BEGIN PRIVATE KEY-----");
-  const ends = key.endsWith("-----END PRIVATE KEY-----\n") || key.endsWith("-----END PRIVATE KEY-----");
-  const len = key.length;
-  // DO NOT log the key; just shape checks:
-  console.log("[lead] env check:", {
-    hasKey: Boolean(key),
-    keyLooksPEM: starts && ends,
-    keyLen: len,
-    hasClientEmail: Boolean(process.env.GOOGLE_CLIENT_EMAIL),
-    hasSheetId: Boolean(process.env.SHEET_ID),
-    runtime: process.env.VERCEL ? "vercel" : "local",
+function sanity() {
+  const k = getPrivateKey();
+  console.log("[lead] key sanity:", {
+    hasKey: !!k,
+    len: k.length,
+    looksPEM: k.startsWith("-----BEGIN PRIVATE KEY-----") && k.includes("END PRIVATE KEY-----"),
   });
-  return starts && ends && len > 1000; // a PEM is typically > 1000 chars
 }
+
 
 async function getSheets() {
   const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
