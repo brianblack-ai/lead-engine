@@ -40,40 +40,41 @@ async function getSheets() {
 }
 
 // --- routes ---
-export async function GET() {
-  sanity("GET-check");
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: { "content-type": "application/json" },
-  });
-}
-
 export async function POST(req: Request) {
   try {
     sanity("POST-check");
 
-   // Map incoming fields to your sheet's header order (A..F)
-const { name = "", email = "", company = "", estimate = "", message = "", source = "web" } = await req.json();
+    // 1) Read body + log what keys actually arrived
+    const body = await req.json();
+    console.log("[lead] body keys ->", Object.keys(body));
 
-// If you want message kept too, either store it in Company or add a new column.
-// For now, we'll keep 'company' separate and ignore 'message' unless you add a column for it.
+    // 2) Map to your sheet columns (A..F = Timestamp, Name, Email, Company, Estimate, Source)
+    const name     = body.name ?? "";
+    const email    = body.email ?? "";
+    const company  = body.company ?? body.org ?? body.organization ?? body.companyName ?? "";
+    const estimate = body.estimate ?? body.quote ?? body.estimateRange ?? body.budget ?? "";
+    const source   = body.source ?? body.utm_source ?? "web";
 
-const values = [[
-  new Date().toISOString(), // Timestamp (A)
-  name,                     // Name (B)
-  email,                    // Email (C)
-  company,                  // Company (D)
-  estimate,                 // Estimate (E)
-  source                    // Source (F)
-]];
+    // 3) Sheets client + append
+    const spreadsheetId = process.env.SHEET_ID!;
+    if (!spreadsheetId) throw new Error("missing SHEET_ID");
+    const sheets = await getSheets();
 
-const res = await sheets.spreadsheets.values.append({
-  spreadsheetId,
-  range: "A:F",                 // append across the first 6 columns
-  valueInputOption: "RAW",
-  requestBody: { values },
-});
+    const values = [[
+      new Date().toISOString(), // A Timestamp
+      name,                     // B Name
+      email,                    // C Email
+      company,                  // D Company
+      estimate,                 // E Estimate
+      source                    // F Source
+    ]];
 
+    const res = await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: "A:F",
+      valueInputOption: "RAW",
+      requestBody: { values },
+    });
 
     return new Response(
       JSON.stringify({ ok: true, updatedRange: res.data.updates?.updatedRange }),
