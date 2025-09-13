@@ -9,7 +9,7 @@ export async function GET(req: Request) {
   const v = verifyToken(token);
   if (!v) return NextResponse.redirect(new URL("/verify-failed", process.env.APP_URL!));
 
-  const rows = await getAllRows();
+  const rows = await getAllRows();  // row 1 = headers
   const H = rows[0];
   const iToken = H.indexOf("VerifyToken");
   const iVerified = H.indexOf("Verified");
