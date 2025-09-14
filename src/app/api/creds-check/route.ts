@@ -1,4 +1,4 @@
-import { getGoogleCreds } from "@/lib/googleAuth";
+import { getGoogleCreds } from "../../../lib/googleAuth";
 
 export const runtime = "nodejs";
 
