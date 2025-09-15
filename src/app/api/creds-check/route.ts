@@ -1,33 +1,23 @@
 import { NextResponse } from "next/server";
+
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET() {
-  const svc = process.env.GOOGLE_SERVICE_ACCOUNT || "";
-  let svcOk = false;
-  if (svc) {
-    try {
-      const p = JSON.parse(svc);
-      svcOk = Boolean(p?.client_email && p?.private_key);
-    } catch {}
-  }
+  const mask = (v?: string) =>
+    v ? (v.length > 6 ? v.slice(0, 3) + "…" + v.slice(-2) : "***") : null;
 
-  const email = process.env.GOOGLE_CLIENT_EMAIL || "";
-  let key = process.env.GOOGLE_PRIVATE_KEY || "";
-  if (key.includes("\\n") && !key.includes("\n")) key = key.replace(/\\n/g, "\n");
-  const pairOk = Boolean(email && key.startsWith("-----BEGIN"));
-
-  const ok = svcOk || pairOk;
-
-  return NextResponse.json(
-    {
-      ok,
-      using: svcOk ? "GOOGLE_SERVICE_ACCOUNT" : pairOk ? "CLIENT_EMAIL+PRIVATE_KEY" : "none",
-      present: {
-        GOOGLE_SERVICE_ACCOUNT: Boolean(svc),
-        GOOGLE_CLIENT_EMAIL:   Boolean(email),
-        GOOGLE_PRIVATE_KEY:    Boolean(process.env.GOOGLE_PRIVATE_KEY),
-      },
+  return NextResponse.json({
+    ok: true,
+    env: {
+      GOOGLE_CLIENT_EMAIL: process.env.GOOGLE_CLIENT_EMAIL || null,
+      GOOGLE_PRIVATE_KEY: mask(process.env.GOOGLE_PRIVATE_KEY),
+      GOOGLE_SERVICE_ACCOUNT: mask(process.env.GOOGLE_SERVICE_ACCOUNT),
+      RESEND_API_KEY: mask(process.env.RESEND_API_KEY),
+      RESEND_API_KEY_PREVIEW: mask(process.env.RESEND_API_KEY_PREVIEW),
+      LEAD_ENGINE_MAGIC_TOKEN_SECRET: mask(process.env.LEAD_ENGINE_MAGIC_TOKEN_SECRET),
+      SHEET_ID: process.env.SHEET_ID || null,
     },
-    { status: ok ? 200 : 500 }
-  );
+  });
 }
