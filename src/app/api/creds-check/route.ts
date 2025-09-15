@@ -1,23 +1,33 @@
-import { getGoogleCreds } from "../../../lib/googleAuth";
-
+import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 export async function GET() {
-  try {
-    const { client_email, private_key } = getGoogleCreds();
-    return Response.json({
-      ok: true,
-      client_email_present: !!client_email,
-      private_key_len: private_key?.length ?? 0
-    });
-  } catch (err: any) {
-    return Response.json(
-      { ok: false, error: String(err?.message || err) },
-      { status: 500 }
-    );
+  const svc = process.env.GOOGLE_SERVICE_ACCOUNT || "";
+  let svcOk = false;
+  if (svc) {
+    try {
+      const p = JSON.parse(svc);
+      svcOk = Boolean(p?.client_email && p?.private_key);
+    } catch {}
   }
-}
 
-export async function POST() {
-  return GET();
+  const email = process.env.GOOGLE_CLIENT_EMAIL || "";
+  let key = process.env.GOOGLE_PRIVATE_KEY || "";
+  if (key.includes("\\n") && !key.includes("\n")) key = key.replace(/\\n/g, "\n");
+  const pairOk = Boolean(email && key.startsWith("-----BEGIN"));
+
+  const ok = svcOk || pairOk;
+
+  return NextResponse.json(
+    {
+      ok,
+      using: svcOk ? "GOOGLE_SERVICE_ACCOUNT" : pairOk ? "CLIENT_EMAIL+PRIVATE_KEY" : "none",
+      present: {
+        GOOGLE_SERVICE_ACCOUNT: Boolean(svc),
+        GOOGLE_CLIENT_EMAIL:   Boolean(email),
+        GOOGLE_PRIVATE_KEY:    Boolean(process.env.GOOGLE_PRIVATE_KEY),
+      },
+    },
+    { status: ok ? 200 : 500 }
+  );
 }
